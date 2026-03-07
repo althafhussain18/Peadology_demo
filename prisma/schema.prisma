@@ -1,0 +1,326 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  TEACHER
+  STUDENT
+  PARENT
+}
+
+enum RecordStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ContentType {
+  LESSON
+  VIDEO
+  BOOK
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ParentRelationship {
+  MOTHER
+  FATHER
+  GUARDIAN
+  OTHER
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  DROPPED
+}
+
+enum StudentActivityType {
+  VIEW_LESSON
+  WATCH_VIDEO
+  OPEN_BOOK
+}
+
+enum FeedbackStatus {
+  OPEN
+  READ
+  RESOLVED
+}
+
+model School {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  code      String
+  status    RecordStatus @default(ACTIVE)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users              User[]
+  subjects           Subject[]
+  studentProfiles    StudentProfile[]
+  teacherSubjects    TeacherSubject[]
+  studentSubjects    StudentSubject[]
+  parentStudentLinks ParentStudentLink[]
+  contentItems       ContentItem[]
+  studentCourseEnrollments StudentCourseEnrollment[]
+  studentLessonProgresses  StudentLessonProgress[]
+  studentContentActivities StudentContentActivity[]
+  parentFeedbacks          ParentFeedback[]
+
+  @@unique([name])
+  @@unique([code])
+  @@map("schools")
+}
+
+model User {
+  id           String       @id @default(uuid()) @db.Uuid
+  schoolId     String       @map("school_id") @db.Uuid
+  fullName     String       @map("full_name")
+  email        String
+  passwordHash String       @map("password_hash")
+  role         UserRole
+  status       RecordStatus @default(ACTIVE)
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  studentProfile         StudentProfile?
+  teacherSubjects        TeacherSubject[]      @relation("TeacherAssignments")
+  studentSubjects        StudentSubject[]      @relation("StudentAssignments")
+  parentLinks            ParentStudentLink[]   @relation("ParentLinks")
+  childLinks             ParentStudentLink[]   @relation("StudentLinks")
+  createdContentItems    ContentItem[]         @relation("ContentCreatedBy")
+  courseEnrollments      StudentCourseEnrollment[] @relation("StudentCourseEnrollments")
+  lessonProgresses       StudentLessonProgress[]   @relation("StudentLessonProgresses")
+  contentActivities      StudentContentActivity[]  @relation("StudentContentActivities")
+  sentParentFeedbacks    ParentFeedback[]          @relation("FeedbackFromParent")
+  feedbackForStudent     ParentFeedback[]          @relation("FeedbackForStudent")
+  receivedParentFeedback ParentFeedback[]          @relation("FeedbackToTeacher")
+
+  @@unique([schoolId, email])
+  @@index([schoolId])
+  @@index([schoolId, role])
+  @@index([schoolId, status])
+  @@map("users")
+}
+
+model Subject {
+  id        String   @id @default(uuid()) @db.Uuid
+  schoolId  String   @map("school_id") @db.Uuid
+  name      String
+  code      String
+  status    RecordStatus @default(ACTIVE)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  teacherSubjects TeacherSubject[]
+  studentSubjects StudentSubject[]
+  contentItems    ContentItem[]
+  parentFeedbacks ParentFeedback[]
+
+  @@unique([schoolId, code])
+  @@unique([schoolId, name])
+  @@index([schoolId])
+  @@map("subjects")
+}
+
+model StudentProfile {
+  id         String   @id @default(uuid()) @db.Uuid
+  schoolId   String   @map("school_id") @db.Uuid
+  userId     String   @unique @map("user_id") @db.Uuid
+  grade      String?
+  section    String?
+  rollNumber String?  @map("roll_number")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, rollNumber])
+  @@index([schoolId])
+  @@map("student_profiles")
+}
+
+model TeacherSubject {
+  id        String   @id @default(uuid()) @db.Uuid
+  schoolId  String   @map("school_id") @db.Uuid
+  teacherId String   @map("teacher_id") @db.Uuid
+  subjectId String   @map("subject_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacher User    @relation("TeacherAssignments", fields: [teacherId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, subjectId])
+  @@index([schoolId])
+  @@index([schoolId, teacherId])
+  @@index([schoolId, subjectId])
+  @@map("teacher_subjects")
+}
+
+model StudentSubject {
+  id        String   @id @default(uuid()) @db.Uuid
+  schoolId  String   @map("school_id") @db.Uuid
+  studentId String   @map("student_id") @db.Uuid
+  subjectId String   @map("subject_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student User    @relation("StudentAssignments", fields: [studentId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, subjectId])
+  @@index([schoolId])
+  @@index([schoolId, studentId])
+  @@index([schoolId, subjectId])
+  @@map("student_subjects")
+}
+
+model ParentStudentLink {
+  id           String             @id @default(uuid()) @db.Uuid
+  schoolId     String             @map("school_id") @db.Uuid
+  parentId     String             @map("parent_id") @db.Uuid
+  studentId    String             @map("student_id") @db.Uuid
+  relationship ParentRelationship @default(OTHER) @map("relationship")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  school  School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  parent  User   @relation("ParentLinks", fields: [parentId], references: [id], onDelete: Cascade)
+  student User   @relation("StudentLinks", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([parentId, studentId])
+  @@index([schoolId])
+  @@index([schoolId, parentId])
+  @@index([schoolId, studentId])
+  @@map("parent_student_links")
+}
+
+model ContentItem {
+  id          String        @id @default(uuid()) @db.Uuid
+  schoolId    String        @map("school_id") @db.Uuid
+  subjectId   String?       @map("subject_id") @db.Uuid
+  createdById String        @map("created_by_id") @db.Uuid
+  type        ContentType
+  status      ContentStatus @default(PUBLISHED)
+  title       String
+  description String?
+  metadata    Json?
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subject   Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  createdBy User     @relation("ContentCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  studentActivities StudentContentActivity[]
+
+  @@index([schoolId])
+  @@index([schoolId, type])
+  @@index([schoolId, status])
+  @@index([schoolId, subjectId])
+  @@map("content_items")
+}
+
+model StudentCourseEnrollment {
+  id         String           @id @default(uuid()) @db.Uuid
+  schoolId   String           @map("school_id") @db.Uuid
+  studentId  String           @map("student_id") @db.Uuid
+  courseId   String           @map("course_id")
+  status     EnrollmentStatus @default(ACTIVE)
+  enrolledAt DateTime         @default(now()) @map("enrolled_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  school  School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student User   @relation("StudentCourseEnrollments", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId])
+  @@index([schoolId])
+  @@index([schoolId, studentId])
+  @@index([schoolId, courseId])
+  @@map("student_course_enrollments")
+}
+
+model StudentLessonProgress {
+  id           String   @id @default(uuid()) @db.Uuid
+  schoolId     String   @map("school_id") @db.Uuid
+  studentId    String   @map("student_id") @db.Uuid
+  courseId     String   @map("course_id")
+  lessonId     String   @map("lesson_id")
+  progressPct  Int      @default(0) @map("progress_pct")
+  completed    Boolean  @default(false)
+  lastViewedAt DateTime @default(now()) @map("last_viewed_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  school  School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student User   @relation("StudentLessonProgresses", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, lessonId])
+  @@index([schoolId])
+  @@index([schoolId, studentId])
+  @@index([schoolId, courseId])
+  @@index([schoolId, lessonId])
+  @@map("student_lesson_progress")
+}
+
+model StudentContentActivity {
+  id            String              @id @default(uuid()) @db.Uuid
+  schoolId      String              @map("school_id") @db.Uuid
+  studentId     String              @map("student_id") @db.Uuid
+  contentItemId String              @map("content_item_id") @db.Uuid
+  activityType  StudentActivityType @map("activity_type")
+  watchMinutes  Int                 @default(0) @map("watch_minutes")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  school      School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student     User        @relation("StudentContentActivities", fields: [studentId], references: [id], onDelete: Cascade)
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([schoolId, studentId])
+  @@index([schoolId, contentItemId])
+  @@index([schoolId, activityType])
+  @@map("student_content_activities")
+}
+
+model ParentFeedback {
+  id        String         @id @default(uuid()) @db.Uuid
+  schoolId  String         @map("school_id") @db.Uuid
+  parentId  String         @map("parent_id") @db.Uuid
+  studentId String         @map("student_id") @db.Uuid
+  teacherId String?        @map("teacher_id") @db.Uuid
+  subjectId String?        @map("subject_id") @db.Uuid
+  message   String
+  status    FeedbackStatus @default(OPEN)
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  parent  User    @relation("FeedbackFromParent", fields: [parentId], references: [id], onDelete: Cascade)
+  student User    @relation("FeedbackForStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  teacher User?   @relation("FeedbackToTeacher", fields: [teacherId], references: [id], onDelete: SetNull)
+  subject Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId])
+  @@index([schoolId, parentId])
+  @@index([schoolId, studentId])
+  @@index([schoolId, teacherId])
+  @@index([schoolId, status])
+  @@map("parent_feedback")
+}
