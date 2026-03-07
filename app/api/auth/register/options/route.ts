@@ -1,24 +1,14 @@
 import { NextResponse } from "next/server"
 import { RecordStatus } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
+import { ensureRegisterBootstrap } from "@/lib/auth/register-bootstrap"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 
 export async function GET() {
   try {
-    const school = await prisma.school.findFirst({
-      where: { status: RecordStatus.ACTIVE },
-      select: { id: true },
-      orderBy: { createdAt: "asc" },
-    })
-
-    if (!school) {
-      return NextResponse.json(
-        { data: { subjects: [] } },
-        { headers: { "Cache-Control": "no-store" } },
-      )
-    }
+    const school = await ensureRegisterBootstrap()
 
     const subjects = await prisma.subject.findMany({
       where: {
