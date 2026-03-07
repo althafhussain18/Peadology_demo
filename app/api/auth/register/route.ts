@@ -1,4 +1,4 @@
-import { RecordStatus, UserRole } from "@prisma/client"
+import { Prisma, RecordStatus, UserRole } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
@@ -119,7 +119,21 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json({ ok: true }, { status: 201 })
-  } catch {
+  } catch (error) {
+    console.error("Register API error", error)
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002") {
+        return badRequest("An account already exists with this email")
+      }
+      if (error.code === "P2021") {
+        return NextResponse.json(
+          { error: "Database schema is missing tables. Run migrations." },
+          { status: 500 },
+        )
+      }
+    }
+
     return NextResponse.json({ error: "Failed to create account" }, { status: 500 })
   }
 }
