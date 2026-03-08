@@ -136,6 +136,8 @@ export default function RegisterPage() {
         return
       }
 
+      window.sessionStorage.setItem("register-success-toast", "1")
+
       const loginResult = await signIn('credentials', {
         email,
         password,

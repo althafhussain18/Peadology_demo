@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { GraduationCap, Menu, X, Search, Bell, User, ShoppingCart, Heart, LogOut, ChevronDown } from "lucide-react"
 import Link from "next/link"
@@ -51,6 +51,8 @@ export function Navigation({ onCartClick, onWishlistClick }: NavigationProps) {
   const { cartCount, wishlistCount } = useCart()
   const { data: session, status } = useSession()
   const isAuthenticated = status === "authenticated"
+  const lastScrollYRef = useRef(0)
+  const tickingRef = useRef(false)
   const fullName = session?.user?.fullName ?? "User"
   const role = session?.user?.role ?? null
 
@@ -163,38 +165,44 @@ export function Navigation({ onCartClick, onWishlistClick }: NavigationProps) {
   }, [isAuthenticated, role])
 
   useEffect(() => {
-    let lastScrollY = window.scrollY
-    let ticking = false
+    lastScrollYRef.current = window.scrollY
 
     const onScroll = () => {
-      if (ticking) return
-      ticking = true
+      if (tickingRef.current) return
+      tickingRef.current = true
 
       window.requestAnimationFrame(() => {
         const currentY = window.scrollY
-        const delta = currentY - lastScrollY
+        const lastY = lastScrollYRef.current
 
-        if (Math.abs(delta) > 6) {
-          if (delta < 0 && currentY > 80) {
-            // Scrolling up: hide navbar.
-            setIsNavVisible(false)
-          } else {
-            // Scrolling down: show navbar.
-            setIsNavVisible(true)
-          }
-          lastScrollY = currentY
-        }
-
-        if (currentY <= 10) {
+        if (currentY <= 12) {
+          setIsNavVisible(true)
+        } else if (currentY < lastY - 4) {
+          // Scrolling up: hide navbar.
+          setIsNavVisible(false)
+        } else if (currentY > lastY + 4) {
+          // Scrolling down: show navbar.
           setIsNavVisible(true)
         }
 
-        ticking = false
+        lastScrollYRef.current = currentY
+        tickingRef.current = false
       })
     }
 
     window.addEventListener("scroll", onScroll, { passive: true })
     return () => window.removeEventListener("scroll", onScroll)
+  }, [])
+
+  useEffect(() => {
+    const registeredToast = window.sessionStorage.getItem("register-success-toast")
+    if (registeredToast === "1") {
+      toast({
+        title: "🎉 User created successfully!",
+        description: "Welcome to LearnQuest.",
+      })
+      window.sessionStorage.removeItem("register-success-toast")
+    }
   }, [])
 
   useEffect(() => {
