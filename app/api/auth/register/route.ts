@@ -2,6 +2,7 @@ import { Prisma, RecordStatus, UserRole } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { ensureRegisterBootstrap } from "@/lib/auth/register-bootstrap"
 
 type RegisterBody = {
   fullName?: string
@@ -50,15 +51,7 @@ export async function POST(request: Request) {
       return badRequest("Invalid role")
     }
 
-    const school = await prisma.school.findFirst({
-      where: { status: RecordStatus.ACTIVE },
-      select: { id: true },
-      orderBy: { createdAt: "asc" },
-    })
-
-    if (!school) {
-      return NextResponse.json({ error: "No active school configured" }, { status: 500 })
-    }
+    const school = await ensureRegisterBootstrap()
 
     const existingUser = await prisma.user.findFirst({
       where: {
