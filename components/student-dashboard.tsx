@@ -74,7 +74,7 @@ export function StudentDashboard() {
     : "Student"
 
   const handleSignOut = async () => {
-    await signOut({ callbackUrl: "/" })
+    await signOut({ callbackUrl: window.location.origin })
   }
 
   useEffect(() => {
