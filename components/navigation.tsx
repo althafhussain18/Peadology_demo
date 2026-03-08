@@ -43,6 +43,7 @@ type NotificationItem = {
 
 export function Navigation({ onCartClick, onWishlistClick }: NavigationProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [isNavVisible, setIsNavVisible] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [notificationLoading, setNotificationLoading] = useState(false)
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
@@ -162,6 +163,41 @@ export function Navigation({ onCartClick, onWishlistClick }: NavigationProps) {
   }, [isAuthenticated, role])
 
   useEffect(() => {
+    let lastScrollY = window.scrollY
+    let ticking = false
+
+    const onScroll = () => {
+      if (ticking) return
+      ticking = true
+
+      window.requestAnimationFrame(() => {
+        const currentY = window.scrollY
+        const delta = currentY - lastScrollY
+
+        if (Math.abs(delta) > 6) {
+          if (delta < 0 && currentY > 80) {
+            // Scrolling up: hide navbar.
+            setIsNavVisible(false)
+          } else {
+            // Scrolling down: show navbar.
+            setIsNavVisible(true)
+          }
+          lastScrollY = currentY
+        }
+
+        if (currentY <= 10) {
+          setIsNavVisible(true)
+        }
+
+        ticking = false
+      })
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true })
+    return () => window.removeEventListener("scroll", onScroll)
+  }, [])
+
+  useEffect(() => {
     const previousOverflow = document.body.style.overflow
     if (isOpen) {
       document.body.style.overflow = "hidden"
@@ -177,7 +213,11 @@ export function Navigation({ onCartClick, onWishlistClick }: NavigationProps) {
   const roleLabel = role ? `${role[0]}${role.slice(1).toLowerCase()}` : ""
 
   return (
-    <header className="sticky top-0 z-[200] bg-background/80 backdrop-blur-lg border-b border-border">
+    <header
+      className={`sticky top-0 z-[200] border-b border-border bg-background/80 backdrop-blur-lg transition-transform duration-500 ease-in-out will-change-transform ${
+        isNavVisible ? "translate-y-0" : "-translate-y-full"
+      }`}
+    >
       <nav className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
 

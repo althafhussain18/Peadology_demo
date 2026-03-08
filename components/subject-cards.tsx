@@ -91,23 +91,26 @@ export function SubjectCards({ onSelectCourse }: SubjectCardsProps) {
   const isTeacher = session?.user?.role === "TEACHER"
 
   useEffect(() => {
+    const controller = new AbortController()
+
     const loadEnrollments = async () => {
       if (status !== "authenticated" || !isStudent) {
         setEnrolledCourseIds([])
         return
       }
 
-      const response = await fetch("/api/student/enrollments", { cache: "no-store" })
-      if (!response.ok) {
-        return
+      const [enrollmentsResponse, learningResponse] = await Promise.all([
+        fetch("/api/student/enrollments", { cache: "no-store", signal: controller.signal }),
+        fetch("/api/dashboard/student/learning", { cache: "no-store", signal: controller.signal }),
+      ])
+
+      if (enrollmentsResponse.ok) {
+        const enrollmentPayload = (await enrollmentsResponse.json()) as {
+          data: Array<{ courseId: string }>
+        }
+        setEnrolledCourseIds(enrollmentPayload.data.map((item) => item.courseId))
       }
 
-      const payload = (await response.json()) as {
-        data: Array<{ courseId: string }>
-      }
-      setEnrolledCourseIds(payload.data.map((item) => item.courseId))
-
-      const learningResponse = await fetch("/api/dashboard/student/learning", { cache: "no-store" })
       if (learningResponse.ok) {
         const learningPayload = (await learningResponse.json()) as {
           data: Array<{ courseId: string; completionPct: number; status: string }>
@@ -116,16 +119,20 @@ export function SubjectCards({ onSelectCourse }: SubjectCardsProps) {
         const completed: string[] = []
         for (const item of learningPayload.data) {
           progressMap[item.courseId] = item.completionPct
-          if (item.status === "COMPLETED" || item.completionPct >= 100) {
-            completed.push(item.courseId)
-          }
+          if (item.status === "COMPLETED" || item.completionPct >= 100) completed.push(item.courseId)
         }
         setCourseProgressById(progressMap)
         setCompletedCourseIds(completed)
       }
     }
 
-    loadEnrollments()
+    loadEnrollments().catch(() => {
+      // Ignore aborted/temporary fetch failures.
+    })
+
+    return () => {
+      controller.abort()
+    }
   }, [status, isStudent])
 
   const enrolledSet = useMemo(() => new Set(enrolledCourseIds), [enrolledCourseIds])
