@@ -72,7 +72,7 @@ export function Navigation({ onCartClick, onWishlistClick }: NavigationProps) {
   }
 
   const handleSignOut = async () => {
-    await signOut({ callbackUrl: "/" })
+    await signOut({ callbackUrl: window.location.origin })
   }
 
   const runLandingSearch = (rawQuery: string) => {
