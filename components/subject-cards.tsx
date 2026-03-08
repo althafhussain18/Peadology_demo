@@ -97,7 +97,7 @@ export function SubjectCards({ onSelectCourse }: SubjectCardsProps) {
         return
       }
 
-      const response = await fetch("/api/student/enrollments")
+      const response = await fetch("/api/student/enrollments", { cache: "no-store" })
       if (!response.ok) {
         return
       }
@@ -107,7 +107,7 @@ export function SubjectCards({ onSelectCourse }: SubjectCardsProps) {
       }
       setEnrolledCourseIds(payload.data.map((item) => item.courseId))
 
-      const learningResponse = await fetch("/api/dashboard/student/learning")
+      const learningResponse = await fetch("/api/dashboard/student/learning", { cache: "no-store" })
       if (learningResponse.ok) {
         const learningPayload = (await learningResponse.json()) as {
           data: Array<{ courseId: string; completionPct: number; status: string }>
@@ -155,8 +155,16 @@ export function SubjectCards({ onSelectCourse }: SubjectCardsProps) {
       return
     }
 
+    const previousEnrolled = enrolledSet.has(courseId)
+
     try {
       setEnrollingCourseId(courseId)
+      if (!previousEnrolled) {
+        // Optimistic update so UI reflects enrollment immediately on slower networks.
+        setEnrolledCourseIds((prev) => [...new Set([...prev, courseId])])
+        setCourseProgressById((prev) => ({ ...prev, [courseId]: Math.max(prev[courseId] ?? 0, 0) }))
+      }
+
       const response = await fetch("/api/student/enrollments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -165,6 +173,9 @@ export function SubjectCards({ onSelectCourse }: SubjectCardsProps) {
 
       const payload = (await response.json()) as { error?: string }
       if (!response.ok) {
+        if (!previousEnrolled) {
+          setEnrolledCourseIds((prev) => prev.filter((id) => id !== courseId))
+        }
         toast({
           title: "Enrollment failed",
           description: payload.error ?? "Unable to enroll now.",
@@ -172,8 +183,6 @@ export function SubjectCards({ onSelectCourse }: SubjectCardsProps) {
         return
       }
 
-      setEnrolledCourseIds((prev) => [...new Set([...prev, courseId])])
-      setCourseProgressById((prev) => ({ ...prev, [courseId]: Math.max(prev[courseId] ?? 0, 0) }))
       toast({
         title: "Enrolled successfully",
         description: `You are now enrolled in ${courseName}.`,
